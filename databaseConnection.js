@@ -1,16 +1,10 @@
 const MongoClient = require("mongodb").MongoClient;
 
-const is_hosted = process.env.IS_HOSTED || false;
+const is_hosted = process.env.IS_HOSTED === "true";
 
 const hostedURI = "mongodb+srv://theMongoAdmin:accidentalLoginSteps@cluster0.4ulcc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
 const localURI = "mongodb://127.0.0.1/?authSource=admin&retryWrites=true&w=majority";
 
-let database;
-
-if (is_hosted) {
-  database = new MongoClient(hostedURI);
-} else {
-  database = new MongoClient(localURI);
-}
+const database = new MongoClient(is_hosted ? hostedURI : localURI);
 
 module.exports = database;
