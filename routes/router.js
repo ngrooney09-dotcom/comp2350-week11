@@ -7,8 +7,6 @@ const { ObjectId } = require('mongodb');
 
 const passwordPepper = "SeCretPeppa4MySal+";
 
-
-// 👉 GET ALL USERS
 router.get('/', async (req, res) => {
 	try {
 		const userCollection = database.db('lab_example').collection('users');
@@ -27,7 +25,6 @@ router.get('/', async (req, res) => {
 });
 
 
-// 👉 ADD USER
 router.post('/addUser', async (req, res) => {
 	try {
 		const userCollection = database.db('lab_example').collection('users');
@@ -54,23 +51,74 @@ router.post('/addUser', async (req, res) => {
 });
 
 
-// 👉 DELETE USER
+
 router.get('/deleteUser', async (req, res) => {
 	try {
-		const userCollection = database.db('lab_example').collection('users');
+		console.log("delete user");
 
-		const userId = req.query.id;
+		let user_id = req.query.id;
 
-		if (userId) {
-			await userCollection.deleteOne({
-				_id: new ObjectId(userId)
-			});
+		const schema = Joi.object({
+			user_id: Joi.string().alphanum().min(24).max(24).required()
+		});
+
+		const validationResult = schema.validate({ user_id });
+		if (validationResult.error != null) {
+			console.log(validationResult.error);
+			res.render('error', { message: 'Invalid user_id' });
+			return;
 		}
 
-		res.redirect('/');
-	} catch (err) {
-		console.log(err);
-		res.render('error', { message: 'Error deleting user' });
+		if (user_id) {
+			console.log("userId: " + user_id);
+			await petCollection.deleteMany({ "user_id": new ObjectId(user_id) });
+			await userCollection.deleteOne({ "_id": new ObjectId(user_id) });
+			console.log("deleteUser done");
+		}
+
+		res.redirect("/");
+	} catch (ex) {
+		res.render('error', { message: 'Error connecting to MongoDB' });
+		console.log("Error connecting to MongoDB");
+		console.log(ex);
+	}
+});
+router.get('/showPets', async (req, res) => {
+	console.log("page hit");
+
+	try {
+		let user_id = req.query.id;
+		console.log("userId: " + user_id);
+
+		const schema = Joi.object({
+			user_id: Joi.string().alphanum().min(24).max(24).required()
+		});
+
+		const validationResult = schema.validate({ user_id });
+		if (validationResult.error != null) {
+			console.log(validationResult.error);
+			res.render('error', { message: 'Invalid user_id' });
+			return;
+		}
+
+		const pets = await petCollection.find({ "user_id": new ObjectId(user_id) }).toArray();
+
+		if (pets === null) {
+			res.render('error', { message: 'Error connecting to MongoDB' });
+			console.log("Error connecting to user collection");
+		} else {
+			pets.map((item) => {
+				item.pet_id = item._id;
+				return item;
+			});
+
+			console.log(pets);
+			res.render('pets', { allPets: pets, user_id: user_id });
+		}
+	} catch (ex) {
+		res.render('error', { message: 'Error connecting to MongoDB' });
+		console.log("Error connecting to MongoDB");
+		console.log(ex);
 	}
 });
 
