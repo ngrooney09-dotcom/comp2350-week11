@@ -1,11 +1,14 @@
+
 const router = require('express').Router();
 const database = require('../databaseConnection');
 
 const crypto = require('crypto');
 const { v4: uuid } = require('uuid');
 const { ObjectId } = require('mongodb');
+const Joi = require('joi');
 
 const passwordPepper = "SeCretPeppa4MySal+";
+
 
 router.get('/', async (req, res) => {
 	try {
@@ -23,6 +26,7 @@ router.get('/', async (req, res) => {
 		res.render('error', { message: 'Error connecting to MongoDB' });
 	}
 });
+
 
 
 router.post('/addUser', async (req, res) => {
@@ -54,7 +58,8 @@ router.post('/addUser', async (req, res) => {
 
 router.get('/deleteUser', async (req, res) => {
 	try {
-		console.log("delete user");
+		const userCollection = database.db('lab_example').collection('users');
+		const petCollection = database.db('lab_example').collection('pets');
 
 		let user_id = req.query.id;
 
@@ -63,64 +68,99 @@ router.get('/deleteUser', async (req, res) => {
 		});
 
 		const validationResult = schema.validate({ user_id });
-		if (validationResult.error != null) {
+
+		if (validationResult.error) {
 			console.log(validationResult.error);
-			res.render('error', { message: 'Invalid user_id' });
-			return;
+			return res.render('error', { message: 'Invalid user_id' });
 		}
 
-		if (user_id) {
-			console.log("userId: " + user_id);
-			await petCollection.deleteMany({ "user_id": new ObjectId(user_id) });
-			await userCollection.deleteOne({ "_id": new ObjectId(user_id) });
-			console.log("deleteUser done");
-		}
+		await petCollection.deleteMany({ user_id: new ObjectId(user_id) });
+		await userCollection.deleteOne({ _id: new ObjectId(user_id) });
+
+		console.log("deleteUser done");
 
 		res.redirect("/");
 	} catch (ex) {
-		res.render('error', { message: 'Error connecting to MongoDB' });
-		console.log("Error connecting to MongoDB");
 		console.log(ex);
+		res.render('error', { message: 'Error connecting to MongoDB' });
 	}
 });
-router.get('/showPets', async (req, res) => {
-	console.log("page hit");
 
+
+
+router.get('/showPets', async (req, res) => {
 	try {
+		const petCollection = database.db('lab_example').collection('pets');
+
 		let user_id = req.query.id;
-		console.log("userId: " + user_id);
 
 		const schema = Joi.object({
 			user_id: Joi.string().alphanum().min(24).max(24).required()
 		});
 
 		const validationResult = schema.validate({ user_id });
-		if (validationResult.error != null) {
+
+		if (validationResult.error) {
 			console.log(validationResult.error);
-			res.render('error', { message: 'Invalid user_id' });
-			return;
+			return res.render('error', { message: 'Invalid user_id' });
 		}
 
-		const pets = await petCollection.find({ "user_id": new ObjectId(user_id) }).toArray();
+		const pets = await petCollection
+			.find({ user_id: new ObjectId(user_id) })
+			.toArray();
 
-		if (pets === null) {
-			res.render('error', { message: 'Error connecting to MongoDB' });
-			console.log("Error connecting to user collection");
-		} else {
-			pets.map((item) => {
-				item.pet_id = item._id;
-				return item;
-			});
+		pets.forEach(pet => {
+			pet.pet_id = pet._id;
+		});
 
-			console.log(pets);
-			res.render('pets', { allPets: pets, user_id: user_id });
-		}
+		res.render('pets', {
+			allPets: pets,
+			user_id: user_id
+		});
+
 	} catch (ex) {
-		res.render('error', { message: 'Error connecting to MongoDB' });
-		console.log("Error connecting to MongoDB");
 		console.log(ex);
+		res.render('error', { message: 'Error connecting to MongoDB' });
 	}
 });
 
 
+router.post('/addPet', async (req, res) => {
+	try {
+		const petCollection = database.db('lab_example').collection('pets');
+
+		let user_id = req.body.user_id;
+
+		const schema = Joi.object({
+			user_id: Joi.string().alphanum().min(24).max(24).required(),
+			name: Joi.string().min(2).max(50).required(),
+			pet_type: Joi.string().min(2).max(50).required()
+		});
+
+		const validationResult = schema.validate({
+			user_id,
+			name: req.body.pet_name,
+			pet_type: req.body.pet_type
+		});
+
+		if (validationResult.error) {
+			console.log(validationResult.error);
+			return res.render('error', { message: 'Invalid pet data' });
+		}
+
+		await petCollection.insertOne({
+			name: req.body.pet_name,
+			user_id: new ObjectId(user_id),
+			pet_type: req.body.pet_type
+		});
+
+		res.redirect(`/showPets?id=${user_id}`);
+
+	} catch (ex) {
+		console.log(ex);
+		res.render('error', { message: 'Error adding pet' });
+	}
+});
+
 module.exports = router;
+
